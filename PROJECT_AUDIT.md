@@ -10,7 +10,7 @@
 - Required explicit supplier/buyer and part selections rather than silently selecting the first available record.
 - Corrected the local date formatter and made same-day transaction history resolve to the most recently appended entry.
 - Changed supplier/buyer average price summaries to quantity-weighted unit averages and reflected this in the column labels.
-- Added document metadata and a small SVG favicon.
+- Added document metadata and a small SVG favicon.d
 
 ## File-by-file notes
 
