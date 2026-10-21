@@ -3,7 +3,7 @@
 ## What changed in this redesign
 
 - Replaced the conflicting glossy-blue visual treatments with a cohesive graphite, warm-neutral, and restrained lime design system.
-- Rebuilt the sidebar into three labelled navigation groups and added a persistent utility bar with date, save state, and direct links to stock-in/stock-out workflows.
+- Rebuilt the sidebar into three labelled navigation groups and added a persistent utility bar with date, save state, and direct links to stock-in/stock-out workflows.d
 - Reworked the inventory introduction, metric cards, search state, table hierarchy, and status labels.
 - Refined forms, inputs, transaction tables, badges, buttons, focus states, reduced-motion behavior, and mobile layouts.
 - Added live transaction totals and projected stock quantities to purchase and sale forms.
