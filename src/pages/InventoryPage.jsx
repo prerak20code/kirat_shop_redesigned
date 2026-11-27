@@ -2,21 +2,39 @@ import { useState } from 'react'
 import { RegMark, Badge } from '../components/Bits'
 import Gauge from '../components/Gauge'
 import HeroDiagram from '../components/HeroDiagram'
-import { lastPurchaseFor, lastSaleFor, stockStatus, inventoryStats } from '../lib/calculations'
+import ScannerModal from '../components/ScannerModal'
+import {
+  lastPurchaseFor,
+  lastSaleFor,
+  stockStatus,
+  inventoryStats,
+} from '../lib/calculations'
 import { money } from '../lib/format'
 
 const STATUS_LABEL = { danger: 'Out of stock', warn: 'Low stock', good: 'In stock' }
 
 export default function InventoryPage({ data }) {
   const [search, setSearch] = useState('')
+  const [scannerOpen, setScannerOpen] = useState(false)
   const { total, low, out } = inventoryStats(data)
-  const units = data.variants.reduce((sum, variant) => sum + Math.max(0, Number(variant.stock) || 0), 0)
+  const units = data.variants.reduce(
+    (sum, variant) => sum + Math.max(0, Number(variant.stock) || 0),
+    0
+  )
 
   const q = search.trim().toLowerCase()
   const rows = data.variants.filter((v) => {
     if (!q) return true
     const product = data.products.find((p) => p.id === v.productId)
-    const hay = [product ? product.name : '', v.brand, v.vehicle, v.partNo].join(' ').toLowerCase()
+    const hay = [
+      product ? product.name : '',
+      v.brand,
+      v.vehicle,
+      v.partNo,
+      v.barcode,
+    ]
+      .join(' ')
+      .toLowerCase()
     return hay.includes(q)
   })
 
@@ -28,7 +46,9 @@ export default function InventoryPage({ data }) {
       <div className="page-head">
         <div>
           <h2 className="title">Inventory overview</h2>
-          <div className="desc">A clear view of every tracked part, its stock position and latest pricing.</div>
+          <div className="desc">
+            A clear view of every tracked part, its stock position and latest pricing.
+          </div>
         </div>
         <div className="sheet-tag">STOCK REGISTER / LIVE VIEW</div>
       </div>
@@ -37,10 +57,15 @@ export default function InventoryPage({ data }) {
         <div className="hero-flex">
           <div className="hero-copy">
             <div className="eyebrow">YOUR STOCKROOM, AT A GLANCE</div>
-            <h3>Know what's on the shelf.</h3>
-            <p>Each variant is tracked as its own SKU. See available units, spot replenishment needs and compare the latest purchase and sale prices without hunting through records.</p>
+            <h3>Know what&apos;s on the shelf.</h3>
+            <p>
+              Each variant is tracked as its own SKU with its unique QR or barcode. See available
+              units, spot replenishment needs and compare the latest purchase and sale prices.
+            </p>
           </div>
-          <div className="hero-svg-wrap" aria-hidden="true"><HeroDiagram /></div>
+          <div className="hero-svg-wrap" aria-hidden="true">
+            <HeroDiagram />
+          </div>
         </div>
       </section>
 
@@ -71,19 +96,33 @@ export default function InventoryPage({ data }) {
         <div className="card-inner">
           <div className="table-section-head">
             <div>
-              <h2 className="table-title">Parts register <span className="count">{rows.length} of {data.variants.length}</span></h2>
+              <h2 className="table-title">
+                Parts register{' '}
+                <span className="count">
+                  {rows.length} of {data.variants.length}
+                </span>
+              </h2>
               <p>Stock health and most recent transaction prices by variant.</p>
             </div>
             <span className="table-caption">SKU LEVEL DETAIL</span>
           </div>
-          <div className="searchbar">
-            <input
-              type="search"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              aria-label="Search inventory"
-              placeholder="Search by part, brand, vehicle or part number"
-            />
+          <div className="search-with-scan">
+            <div className="searchbar">
+              <input
+                type="search"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                aria-label="Search inventory"
+                placeholder="Search by part, brand, vehicle, part number or QR/barcode"
+              />
+            </div>
+            <button
+              type="button"
+              className="quick-action quick-action-secondary"
+              onClick={() => setScannerOpen(true)}
+            >
+              Scan to check
+            </button>
           </div>
           <div className="table-wrap">
             <table>
@@ -91,7 +130,7 @@ export default function InventoryPage({ data }) {
                 <tr>
                   <th>Part / variant</th>
                   <th>Vehicle fit</th>
-                  <th>Part number</th>
+                  <th>Part / Code</th>
                   <th>Stock level</th>
                   <th>Status</th>
                   <th className="num">Last cost</th>
@@ -104,7 +143,10 @@ export default function InventoryPage({ data }) {
                     <td colSpan={7}>
                       <div className="empty">
                         {total === 0 ? (
-                          <>Your register is ready. Add a product and its first variant in <b>Parts catalogue</b> to get started.</>
+                          <>
+                            Your register is ready. Add a product and its first variant in{' '}
+                            <b>Parts catalogue</b> to get started.
+                          </>
                         ) : (
                           'No parts match this search. Try a different term.'
                         )}
@@ -127,7 +169,10 @@ export default function InventoryPage({ data }) {
                         {v.partNo && <div className="tsub mono">{v.partNo}</div>}
                       </td>
                       <td>{v.vehicle || <span className="muted-cell">Not specified</span>}</td>
-                      <td className="mono">{v.partNo || '—'}</td>
+                      <td className="mono">
+                        <div>{v.partNo || '—'}</div>
+                        {v.barcode && <div className="tsub">{v.barcode}</div>}
+                      </td>
                       <td>
                         <div className="gaugewrap">
                           <Gauge stock={v.stock} minStock={v.minStock} status={status} />
@@ -137,7 +182,9 @@ export default function InventoryPage({ data }) {
                           </div>
                         </div>
                       </td>
-                      <td><Badge status={status}>{STATUS_LABEL[status]}</Badge></td>
+                      <td>
+                        <Badge status={status}>{STATUS_LABEL[status]}</Badge>
+                      </td>
                       <td className="num">{lastP ? money(lastP.cost) : '—'}</td>
                       <td className="num">{lastS ? money(lastS.price) : '—'}</td>
                     </tr>
@@ -148,6 +195,18 @@ export default function InventoryPage({ data }) {
           </div>
         </div>
       </div>
+
+      <ScannerModal
+        open={scannerOpen}
+        mode="single"
+        title="Scan Part to Check Stock"
+        subtitle="Scan any box QR code or barcode to filter the inventory table to that part."
+        onScan={({ code }) => {
+          setSearch(code)
+          return 'ok'
+        }}
+        onClose={() => setScannerOpen(false)}
+      />
     </div>
   )
 }

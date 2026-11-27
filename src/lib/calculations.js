@@ -56,3 +56,48 @@ export function buyerAvgPrice(state, buyerId) {
   if (!units) return null
   return list.reduce((sum, s) => sum + (Number(s.price) || 0) * Number(s.qty), 0) / units
 }
+
+export function normalizeScanCode(raw) {
+  return String(raw || '').trim()
+}
+
+function compactCode(raw) {
+  return String(raw || '').replace(/[\s-]+/g, '').toLowerCase()
+}
+
+export function findVariantByCode(state, rawCode) {
+  const code = normalizeScanCode(rawCode)
+  if (!code) return null
+  const lower = code.toLowerCase()
+
+  const exactBarcode = state.variants.find(
+    (v) => v.barcode && v.barcode.trim().toLowerCase() === lower
+  )
+  if (exactBarcode) return exactBarcode
+
+  const exactPartNo = state.variants.find(
+    (v) => v.partNo && v.partNo.trim().toLowerCase() === lower
+  )
+  if (exactPartNo) return exactPartNo
+
+  const compact = compactCode(code)
+  if (!compact) return null
+
+  return (
+    state.variants.find((v) => v.barcode && compactCode(v.barcode) === compact) ||
+    state.variants.find((v) => v.partNo && compactCode(v.partNo) === compact) ||
+    null
+  )
+}
+
+export function nextInvoiceNo(state) {
+  const bills = Array.isArray(state.bills) ? state.bills : []
+  let maxNum = 0
+  for (const b of bills) {
+    const m = String(b.invoiceNo || '').match(/(\d+)$/)
+    if (m) {
+      maxNum = Math.max(maxNum, parseInt(m[1], 10) || 0)
+    }
+  }
+  return `INV-${String(maxNum + 1).padStart(4, '0')}`
+}

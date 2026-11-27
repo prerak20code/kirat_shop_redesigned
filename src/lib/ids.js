@@ -4,3 +4,16 @@
 export function uid() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 7)
 }
+
+export function generateShopBarcode(existingVariants = []) {
+  const taken = new Set(
+    existingVariants
+      .map((v) => String(v.barcode || '').trim().toUpperCase())
+      .filter(Boolean)
+  )
+  let seq = 1001 + existingVariants.length
+  while (taken.has(`PL-${seq}`)) {
+    seq += 1
+  }
+  return `PL-${seq}`
+}
