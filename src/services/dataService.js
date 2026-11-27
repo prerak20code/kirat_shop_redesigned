@@ -18,6 +18,7 @@ export const emptyState = {
   buyers: [],
   purchases: [],
   sales: [],
+  bills: [],
 }
 
 // Returns a Promise so callers already treat this as async — this keeps
