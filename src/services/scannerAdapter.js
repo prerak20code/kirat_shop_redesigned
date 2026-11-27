@@ -1,19 +1,18 @@
 import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode'
 
-// Supported QR + 1D retail/automotive barcode formats
+// Checksum-verified 2D + 1D formats only (excludes unchecksummed ITF/Codabar
+// which commonly misread random bars as different numbers on camera frames).
 export const SUPPORTED_FORMATS = [
   Html5QrcodeSupportedFormats.QR_CODE,
+  Html5QrcodeSupportedFormats.DATA_MATRIX,
   Html5QrcodeSupportedFormats.EAN_13,
   Html5QrcodeSupportedFormats.EAN_8,
   Html5QrcodeSupportedFormats.UPC_A,
   Html5QrcodeSupportedFormats.UPC_E,
   Html5QrcodeSupportedFormats.CODE_128,
-  Html5QrcodeSupportedFormats.CODE_39,
-  Html5QrcodeSupportedFormats.CODE_93,
-  Html5QrcodeSupportedFormats.ITF,
-  Html5QrcodeSupportedFormats.CODABAR,
-  Html5QrcodeSupportedFormats.DATA_MATRIX,
 ]
+
+const TWO_D_FORMATS = new Set(['QR_CODE', 'DATA_MATRIX', 'AZTEC', 'PDF_417'])
 
 /**
  * Decoupled scanner adapter interface.
@@ -21,9 +20,16 @@ export const SUPPORTED_FORMATS = [
  * Swap or add adapters here (e.g. Bluetooth HID/Serial or native bridge) without
  * changing page components.
  */
-export function createCameraScannerAdapter({ elementId, onScan, onError }) {
+export function createCameraScannerAdapter({
+  elementId,
+  onScan,
+  onError,
+  onCandidate,
+}) {
   let instance = null
   let running = false
+  // Multi-frame consensus state for 1D barcodes so single-frame misreads are rejected
+  let pending1D = { code: '', count: 0, lastAt: 0 }
 
   async function listCameras() {
     try {
@@ -36,36 +42,65 @@ export function createCameraScannerAdapter({ elementId, onScan, onError }) {
 
   async function start(cameraIdOrConfig) {
     await stop()
+    pending1D = { code: '', count: 0, lastAt: 0 }
+
     instance = new Html5Qrcode(elementId, {
       formatsToSupport: SUPPORTED_FORMATS,
+      useBarCodeDetectorIfSupported: true,
       verbose: false,
     })
 
     const cameraConfig = cameraIdOrConfig
-      ? cameraIdOrConfig
+      ? { deviceId: { exact: cameraIdOrConfig } }
       : { facingMode: 'environment' }
 
     const scanConfig = {
-      fps: 12,
+      fps: 15,
       qrbox: (viewfinderWidth, viewfinderHeight) => {
-        const minEdge = Math.min(viewfinderWidth, viewfinderHeight)
-        const boxW = Math.min(320, Math.max(190, Math.floor(viewfinderWidth * 0.78)))
-        const boxH = Math.min(240, Math.max(150, Math.floor(minEdge * 0.68)))
+        // Wide landscape scan window works well for both horizontal 1D barcodes and QR codes
+        const boxW = Math.min(360, Math.max(210, Math.floor(viewfinderWidth * 0.86)))
+        const boxH = Math.min(240, Math.max(130, Math.floor(viewfinderHeight * 0.58)))
         return { width: boxW, height: boxH }
       },
-      aspectRatio: 1.4,
+      aspectRatio: 1.5,
+      videoConstraints: {
+        ...cameraConfig,
+        width: { ideal: 1280 },
+        height: { ideal: 720 },
+      },
     }
 
     try {
       await instance.start(
-        cameraConfig,
+        cameraIdOrConfig || { facingMode: 'environment' },
         scanConfig,
         (decodedText, decodedResult) => {
           const code = String(decodedText || '').trim()
           if (!code) return
           const format =
             decodedResult?.result?.format?.formatName || 'CODE'
-          onScan({ code, format, source: 'camera' })
+
+          // 2D codes (QR / DataMatrix) have built-in error correction -> accept immediately
+          if (TWO_D_FORMATS.has(format)) {
+            pending1D = { code: '', count: 0, lastAt: 0 }
+            onScan({ code, format, source: 'camera' })
+            return
+          }
+
+          // 1D barcodes: require 2 matching reads within 1200ms before accepting
+          const now = Date.now()
+          if (pending1D.code === code && now - pending1D.lastAt <= 1200) {
+            pending1D.count += 1
+            pending1D.lastAt = now
+          } else {
+            pending1D = { code, count: 1, lastAt: now }
+            if (onCandidate) onCandidate({ code, format })
+          }
+
+          if (pending1D.count >= 2) {
+            pending1D = { code: '', count: 0, lastAt: 0 }
+            onScan({ code, format, source: 'camera' })
+          }
         },
         () => {
           // Ignore per-frame decode misses
@@ -83,6 +118,7 @@ export function createCameraScannerAdapter({ elementId, onScan, onError }) {
   }
 
   async function stop() {
+    pending1D = { code: '', count: 0, lastAt: 0 }
     if (!instance) return
     try {
       if (running) {

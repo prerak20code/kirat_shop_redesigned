@@ -83,11 +83,23 @@ export function findVariantByCode(state, rawCode) {
   const compact = compactCode(code)
   if (!compact) return null
 
-  return (
+  const compactMatch =
     state.variants.find((v) => v.barcode && compactCode(v.barcode) === compact) ||
-    state.variants.find((v) => v.partNo && compactCode(v.partNo) === compact) ||
-    null
-  )
+    state.variants.find((v) => v.partNo && compactCode(v.partNo) === compact)
+  if (compactMatch) return compactMatch
+
+  // Match 12-digit UPC-A and 13-digit 0-prefixed EAN-13 interchangeably
+  if (/^\d{12,13}$/.test(compact)) {
+    const alt = compact.length === 12 ? `0${compact}` : compact.startsWith('0') ? compact.slice(1) : ''
+    if (alt) {
+      return (
+        state.variants.find((v) => v.barcode && compactCode(v.barcode) === alt) ||
+        null
+      )
+    }
+  }
+
+  return null
 }
 
 export function nextInvoiceNo(state) {
