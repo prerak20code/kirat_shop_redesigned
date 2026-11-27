@@ -27,6 +27,7 @@ export default function ScannerModal({
   const [cameraError, setCameraError] = useState('')
   const [manualCode, setManualCode] = useState('')
   const [soundEnabled, setSoundEnabled] = useState(true)
+  const [verifyingText, setVerifyingText] = useState('')
 
   useEffect(() => {
     onScanRef.current = onScan
@@ -40,9 +41,12 @@ export default function ScannerModal({
     if (!open) return undefined
 
     let cancelled = false
+    let verifyTimer = null
     lastCodeRef.current = { code: '', at: 0 }
+    setVerifyingText('')
 
     const handleDetected = (payload) => {
+      setVerifyingText('')
       const now = Date.now()
       if (
         payload.source === 'camera' &&
@@ -65,6 +69,14 @@ export default function ScannerModal({
     const adapter = createCameraScannerAdapter({
       elementId: VIEWPORT_ID,
       onScan: handleDetected,
+      onCandidate: ({ code }) => {
+        if (cancelled) return
+        setVerifyingText(`Verifying 1D barcode ${code}… hold steady`)
+        clearTimeout(verifyTimer)
+        verifyTimer = setTimeout(() => {
+          if (!cancelled) setVerifyingText('')
+        }, 1200)
+      },
       onError: (msg) => {
         if (!cancelled) {
           setCameraState('error')
@@ -108,6 +120,7 @@ export default function ScannerModal({
 
     return () => {
       cancelled = true
+      clearTimeout(verifyTimer)
       adapter.stop()
       adapterRef.current = null
     }
@@ -201,6 +214,10 @@ export default function ScannerModal({
             </div>
           )}
         </div>
+
+        {verifyingText && (
+          <div className="scanner-feedback tone-warn">{verifyingText}</div>
+        )}
 
         {lastFeedback && (
           <div className={`scanner-feedback tone-${lastFeedback.tone || 'ok'}`}>
